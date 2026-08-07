@@ -1,4 +1,4 @@
-# Waku
+# Waku prashant
 
 ⛩️ The minimal React framework
 

@@ -520,6 +520,7 @@ const usePrefetchOnView = (
   const enabled = !!options;
   const mode = options?.mode;
   const ttl = options?.ttl;
+  const errorTtl = options?.errorTtl;
   useEffect(() => {
     if (!enabled || !ref.current) {
       return;
@@ -531,6 +532,7 @@ const usePrefetchOnView = (
             prefetchIfNotCurrent(router, resolvedTo, {
               ...(mode ? { mode } : {}),
               ...(ttl !== undefined ? { ttl } : {}),
+              ...(errorTtl !== undefined ? { errorTtl } : {}),
             });
           }
         });
@@ -541,7 +543,7 @@ const usePrefetchOnView = (
     return () => {
       observer.disconnect();
     };
-  }, [enabled, mode, ttl, router, resolvedTo, ref]);
+  }, [enabled, mode, ttl, errorTtl, router, resolvedTo, ref]);
 };
 
 type NavigationStatus = { pending?: boolean };

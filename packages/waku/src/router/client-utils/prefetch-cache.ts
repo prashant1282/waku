@@ -11,6 +11,12 @@ export type PrefetchOptions = {
   mode?: PrefetchMode;
   /** Milliseconds; defaults to `PREFETCH_TTL`. */
   ttl?: number;
+  /**
+   * Milliseconds to suppress re-prefetching after a failure; defaults to
+   * `PREFETCH_ERROR_TTL`. `0` records no backoff, so the next trigger retries
+   * immediately.
+   */
+  errorTtl?: number;
 };
 
 export type PrefetchEntry = {
@@ -20,6 +26,13 @@ export type PrefetchEntry = {
 
 type PrefetchCache = Map<string, PrefetchEntry>;
 
+// Negative cache: keys whose last prefetch rejected, mapped to the time the
+// suppression lapses. A failed prefetch leaves nothing in PrefetchCache (an
+// entry there would hand a rejected promise to the next navigation), so
+// without this a route that always fails -- one answering with a document
+// location, say -- refetches on every hover.
+type PrefetchFailureCache = Map<string, number>;
+
 // Session store of prefetched responses, keyed by rscPath alone. Entries are
 // only served under the etag protocol: they paint immutable slots (which
 // cannot vary by query) and fall back for a dynamic slot only when the
@@ -28,6 +41,9 @@ type PrefetchCache = Map<string, PrefetchEntry>;
 type PrefetchedElementsStore = Map<string, Elements | null>;
 
 export const PREFETCH_TTL = 1000 * 60;
+// Shorter than PREFETCH_TTL: a failure is often transient (an offline blip),
+// so this collapses a burst of hovers without stranding a route that recovers.
+export const PREFETCH_ERROR_TTL = 1000 * 10;
 export const PREFETCH_LIMIT = 100;
 
 const prefetchCacheKey = (rscPath: string, query: string): string =>
@@ -59,6 +75,37 @@ const setPrefetch = (
     cache.delete(oldest);
   }
   cache.set(key, entry);
+};
+
+const isFailureLive = (
+  failures: PrefetchFailureCache,
+  key: string,
+  now: number,
+): boolean => {
+  const expireAt = failures.get(key);
+  if (expireAt === undefined) {
+    return false;
+  }
+  if (expireAt <= now) {
+    failures.delete(key);
+    return false;
+  }
+  return true;
+};
+
+const setFailure = (
+  failures: PrefetchFailureCache,
+  key: string,
+  expireAt: number,
+): void => {
+  while (failures.size >= PREFETCH_LIMIT) {
+    const oldest = failures.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    failures.delete(oldest);
+  }
+  failures.set(key, expireAt);
 };
 
 const reservePrefetchedElements = (
@@ -111,9 +158,18 @@ type PrefetchManager = {
 export const createPrefetchManager = (): PrefetchManager => {
   let cache: PrefetchCache = new Map();
   let store: PrefetchedElementsStore = new Map();
+  let failures: PrefetchFailureCache = new Map();
   return {
     prefetch: (rscPath, query, fetchElements, options) =>
-      startPrefetch(cache, store, rscPath, query, fetchElements, options),
+      startPrefetch(
+        cache,
+        store,
+        failures,
+        rscPath,
+        query,
+        fetchElements,
+        options,
+      ),
     get: (rscPath, query) =>
       getPrefetch(cache, prefetchCacheKey(rscPath, query), Date.now()),
     getElements: (rscPath) => store.get(rscPath) ?? undefined,
@@ -121,6 +177,7 @@ export const createPrefetchManager = (): PrefetchManager => {
       // replace the maps so an in-flight prefetch completes into detached ones
       cache = new Map();
       store = new Map();
+      failures = new Map();
     },
   };
 };
@@ -128,6 +185,7 @@ export const createPrefetchManager = (): PrefetchManager => {
 const startPrefetch = (
   cache: PrefetchCache,
   store: PrefetchedElementsStore,
+  failures: PrefetchFailureCache,
   rscPath: string,
   query: string,
   fetchElements: (base: Elements | undefined) => Promise<Elements>,
@@ -143,6 +201,10 @@ const startPrefetch = (
   if (getPrefetch(cache, key, now)) {
     return;
   }
+  // Back off from a key whose last attempt rejected, per the error ttl.
+  if (isFailureLive(failures, key, now)) {
+    return;
+  }
   const base = store.get(rscPath) ?? undefined;
   const promise = fetchElements(base);
   const entry: PrefetchEntry = {
@@ -156,10 +218,19 @@ const startPrefetch = (
       mergePrefetchedElements(store, rscPath, resolved);
     },
     () => {
-      // TODO a negative ttl, so a route that answers with a document location
-      // is not fetched again on every hover
+      // Only the current attempt may record a backoff: a stale one has already
+      // been replaced in `cache`, and letting it write would suppress the
+      // newer fetch that superseded it.
       if (cache.get(key) === entry) {
         cache.delete(key);
+        // Nothing survives in `cache` to dedupe against -- a rejected promise
+        // there would surface as the next navigation's `unstable_prefetched`
+        // -- so the backoff is recorded separately.
+        setFailure(
+          failures,
+          key,
+          Date.now() + (options?.errorTtl ?? PREFETCH_ERROR_TTL),
+        );
       }
       releasePrefetchedElements(store, rscPath);
     },
