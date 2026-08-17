@@ -1,0 +1,25 @@
+name: Knowledge Base
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Uzera CLI
+        run: |
+          curl -fsSL "https://api.gainserv.com/api/uzera/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Index repository
+        run: uzera index --project "${{ github.workspace }}"
+
+      - name: Upload wiki
+        env:
+          UZERA_SCANNER_KEY: ${{ secrets.UZERA_SCANNER_KEY }}
+        run: uzera wiki push --project "${{ github.workspace }}"
