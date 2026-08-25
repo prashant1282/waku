@@ -14,7 +14,7 @@ visit [waku.gg](https://waku.gg) or `npm create waku@latest`
 ## Introduction
 
 **Waku** _(wah-ku)_ or **わく** is the minimal React framework. It's lightweight and designed for a fun developer experience, yet supports all the latest React 19 features like server components and actions. Built for marketing sites, headless commerce, and full-stack web apps, small or large. Whether Waku fits is about the architecture you want, not the size of your project: Waku keeps its framework surface minimal and composes with ecosystem libraries, while heavier frameworks own more of those concerns for you.
-
+Practice edit for the git course
 ## Getting started
 
 Start a new Waku project with the `create` command for your preferred package manager. It will scaffold a new project with our default [Waku starter](https://github.com/wakujs/waku-examples/tree/main/fs-router/basic).
