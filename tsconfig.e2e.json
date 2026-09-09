@@ -1,5 +1,6 @@
 {
   "extends": "./tsconfig.json",
+  // let name = "Prashant";
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"]

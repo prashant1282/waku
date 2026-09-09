@@ -29,10 +29,6 @@ npm create waku@latest
 - `waku build` to generate a production build
 - `waku start` to serve the production build locally
 
-**Node.js version requirement:** `^26.0.0` or `^24.0.0` or `^22.15.0`
-
-For a guided path, start with the [Quick Start](https://waku.gg/guides/quick-start) guide and continue with the Learn series on [waku.gg/guides](https://waku.gg/guides), which builds a small app step by step.
-
 ## Rendering
 
 While there's a bit of a learning curve to modern React rendering, it introduces powerful new patterns of full-stack composability that are only possible with the advent of [server components](https://github.com/reactjs/rfcs/blob/main/text/0188-server-components.md).
