@@ -5,6 +5,8 @@ import { useState } from 'react';
 export const Counter = () => {
   const [count, setCount] = useState(0);
 
+  console.log('[Counter] rendered, count =', count);
+
   const handleIncrement = () => setCount((c) => c + 1);
 
   return (
